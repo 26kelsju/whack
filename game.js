@@ -4,10 +4,14 @@
 function runGame() {
   // --- Game Variables ---
   let score = 0;
+  let timeLeft = 30; // Timer starts at 30 seconds
   const holes = document.querySelectorAll('.hole');
   const scoreText = document.querySelector('#scoreText');
-  let activeMole = null; // To keep track of the current mole
-  const gameSpeed = 1000; // How often a new mole appears (in milliseconds)
+  const timerText = document.querySelector('#timerText'); // Get the timer element
+  let activeMole = null;
+  const gameSpeed = 1000;
+  let moleInterval = null; // To store the mole generation interval
+  let timerInterval = null; // To store the timer interval
 
   console.log("A-Frame scene loaded. Starting the game! 🔨");
 
@@ -15,6 +19,10 @@ function runGame() {
 
   function updateScore() {
     scoreText.setAttribute('value', `Score: ${score}`);
+  }
+
+  function updateTimer() {
+    timerText.setAttribute('value', `Time: ${timeLeft}`);
   }
 
   function hideMole(wasHit) {
@@ -34,45 +42,36 @@ function runGame() {
       hideMole(false);
     }
     
-    // 1. Pick a random hole
     const randomIndex = Math.floor(Math.random() * holes.length);
     const randomHole = holes[randomIndex];
 
-    // Check if we found a hole, if not, something is wrong.
     if (!randomHole) {
         console.error("Could not find a random hole. Check your .hole class in HTML.");
         return;
     }
 
-    // 2. Decide mole shape and color
     const isBox = Math.random() > 0.5;
     const moleShape = isBox ? 'a-box' : 'a-sphere';
     const moleColor = isBox ? '#FFC107' : '#E91E63';
-
-    // 3. Create the mole entity
     const mole = document.createElement(moleShape);
     
-    // 4. Set its properties
     mole.setAttribute('class', 'mole');
     mole.setAttribute('color', moleColor);
     
     const holePosition = randomHole.getAttribute('position');
-    
     mole.setAttribute('position', {
       x: holePosition.x,
-      y: holePosition.y + 0.1, // Start below ground
+      y: holePosition.y + 0.1,
       z: holePosition.z
     });
 
     if (isBox) {
       mole.setAttribute('scale', '0.5 0.5 0.5');
-    } else { // It's a sphere
+    } else {
       mole.setAttribute('radius', '0.3');
     }
 
-    // 5. Add an animation to make it pop up
     const targetPosition = `${holePosition.x} ${holePosition.y + 0.5} ${holePosition.z}`;
-
     mole.setAttribute('animation', {
       property: 'position',
       to: targetPosition,
@@ -80,12 +79,13 @@ function runGame() {
       easing: 'easeOutQuad'
     });
     
-    // 6. Add event listener for when it's clicked/gazed at
     mole.addEventListener('click', () => {
-      hideMole(true);
+      // Only allow hits if the game is still running
+      if (timeLeft > 0) {
+        hideMole(true);
+      }
     });
 
-    // 7. Add the mole to the scene and track it
     const sceneEl = document.querySelector('a-scene');
     sceneEl.appendChild(mole);
     activeMole = mole;
@@ -93,7 +93,28 @@ function runGame() {
 
   // --- Start the Game ---
   updateScore();
-  setInterval(showMole, gameSpeed);
+  updateTimer();
+
+  // Start the mole popping interval
+  moleInterval = setInterval(showMole, gameSpeed);
+
+  // Start the countdown timer interval
+  timerInterval = setInterval(() => {
+    timeLeft--;
+    updateTimer();
+
+    // Check if the game is over
+    if (timeLeft <= 0) {
+      clearInterval(moleInterval); // Stop moles from appearing
+      clearInterval(timerInterval); // Stop the timer
+      timerText.setAttribute('value', 'Game Over!');
+
+      // Hide the last mole
+      if (activeMole) {
+        hideMole(false);
+      }
+    }
+  }, 1000); // This function runs every 1000ms (1 second)
 }
 
 // --- Wait for the A-Frame scene to load before starting the game ---
