@@ -72,13 +72,13 @@ window.onload = () => {
     }
 
     // 5. Add an animation to make it pop up
+    // ** THE FIX IS HERE! **
+    // The 'to' property needs a string "x y z", not an object {x, y, z}.
+    const targetPosition = `${holePosition.x} ${holePosition.y + 0.5} ${holePosition.z}`;
+
     mole.setAttribute('animation', {
       property: 'position',
-      to: {
-        x: holePosition.x,
-        y: holePosition.y + 0.5, // Pop up above ground
-        z: holePosition.z
-      },
+      to: targetPosition, // Use the new string variable here
       dur: 300, // Duration of pop-up animation
       easing: 'easeOutQuad'
     });
