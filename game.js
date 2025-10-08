@@ -1,42 +1,35 @@
-window.onload = () => {
-  // --- Global Variables ---
+/*
+ * Whack-a-Mole Game Logic
+ */
+function runGame() {
+  // --- Game Variables ---
   let score = 0;
   const holes = document.querySelectorAll('.hole');
   const scoreText = document.querySelector('#scoreText');
   let activeMole = null; // To keep track of the current mole
   const gameSpeed = 1000; // How often a new mole appears (in milliseconds)
 
+  console.log("A-Frame scene loaded. Starting the game! 🔨");
+
   // --- Game Functions ---
 
-  /**
-   * Updates the score display in the VR scene.
-   */
   function updateScore() {
     scoreText.setAttribute('value', `Score: ${score}`);
   }
 
-  /**
-   * Makes the current mole disappear and prepares for the next one.
-   * @param {boolean} wasHit - True if the mole was hit by the player.
-   */
   function hideMole(wasHit) {
-    if (!activeMole) return; // No active mole to hide
+    if (!activeMole) return;
 
     if (wasHit) {
       score++;
       updateScore();
     }
     
-    // Remove the mole from the scene
     activeMole.parentNode.removeChild(activeMole);
     activeMole = null;
   }
   
-  /**
-   * Creates and displays a new mole at a random hole.
-   */
   function showMole() {
-    // If a mole is already active, hide it (as if it was a miss)
     if (activeMole) {
       hideMole(false);
     }
@@ -45,7 +38,13 @@ window.onload = () => {
     const randomIndex = Math.floor(Math.random() * holes.length);
     const randomHole = holes[randomIndex];
 
-    // 2. Decide if it's a box or a sphere
+    // Check if we found a hole, if not, something is wrong.
+    if (!randomHole) {
+        console.error("Could not find a random hole. Check your .hole class in HTML.");
+        return;
+    }
+
+    // 2. Decide mole shape and color
     const isBox = Math.random() > 0.5;
     const moleShape = isBox ? 'a-box' : 'a-sphere';
     const moleColor = isBox ? '#FFC107' : '#E91E63';
@@ -54,11 +53,11 @@ window.onload = () => {
     const mole = document.createElement(moleShape);
     
     // 4. Set its properties
-    mole.setAttribute('class', 'mole'); // IMPORTANT for the cursor to detect it
+    mole.setAttribute('class', 'mole');
     mole.setAttribute('color', moleColor);
     
-    // Position it slightly below the hole to start
     const holePosition = randomHole.getAttribute('position');
+    
     mole.setAttribute('position', {
       x: holePosition.x,
       y: holePosition.y + 0.1, // Start below ground
@@ -72,14 +71,12 @@ window.onload = () => {
     }
 
     // 5. Add an animation to make it pop up
-    // ** THE FIX IS HERE! **
-    // The 'to' property needs a string "x y z", not an object {x, y, z}.
     const targetPosition = `${holePosition.x} ${holePosition.y + 0.5} ${holePosition.z}`;
 
     mole.setAttribute('animation', {
       property: 'position',
-      to: targetPosition, // Use the new string variable here
-      dur: 300, // Duration of pop-up animation
+      to: targetPosition,
+      dur: 300,
       easing: 'easeOutQuad'
     });
     
@@ -89,15 +86,20 @@ window.onload = () => {
     });
 
     // 7. Add the mole to the scene and track it
-    const scene = document.querySelector('a-scene');
-    scene.appendChild(mole);
+    const sceneEl = document.querySelector('a-scene');
+    sceneEl.appendChild(mole);
     activeMole = mole;
   }
 
-  // --- Game Start ---
-  console.log("Whack-a-Mole Game Loaded! 🔨");
+  // --- Start the Game ---
   updateScore();
-  
-  // The main game loop: show a new mole at a regular interval
   setInterval(showMole, gameSpeed);
-};
+}
+
+// --- Wait for the A-Frame scene to load before starting the game ---
+const scene = document.querySelector('a-scene');
+if (scene.hasLoaded) {
+  runGame();
+} else {
+  scene.addEventListener('loaded', runGame);
+}
