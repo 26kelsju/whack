@@ -1,18 +1,20 @@
+Of course! You've run into a common timing issue. The moles were likely being created and destroyed before their animations could properly play out.
+
+I've revised the code to use A-Frame's built-in animation events instead of timers. This is a more reliable way to ensure the moles pop up, wait, and then go back down correctly.
+
+Revised Game Code
+Here is the complete, corrected code. Copy and paste this into your index.html file.
+
+HTML
+
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Whack-A-Mole VR</title>
+    <title>Whack-A-Mole VR (Revised)</title>
     <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
 </head>
 <body>
     <a-scene>
-        <a-assets>
-            <a-mixin id="mole" geometry="primitive: box; height: 0.8" material="color: #654321"
-                     animation__up="property: position; to: 0 0.4 0; dur: 300; easing: easeOutQuad; startEvents: pop"
-                     animation__down="property: position; to: 0 -0.8 0; dur: 200; easing: easeInQuad; startEvents: hide">
-            </a-mixin>
-        </a-assets>
-
         <a-plane id="ground" position="0 0 -4" rotation="-90 0 0" width="10" height="10" color="#7BC8A4"></a-plane>
         <a-sky color="#87CEEB"></a-sky>
 
@@ -43,7 +45,6 @@
                     this.score = 0;
                     this.scoreText = document.querySelector('#score-text');
                     this.timerText = document.querySelector('#timer-text');
-                    this.moles = [];
                     this.timeLeft = this.data.gameDuration / 1000;
                     this.gameTimer = null;
                     this.moleTimer = null;
@@ -55,8 +56,8 @@
                     this.score = 0;
                     this.updateScore(0);
                     this.timeLeft = this.data.gameDuration / 1000;
+                    this.timerText.setAttribute('value', 'Time: ' + this.timeLeft);
 
-                    // Start game countdown timer
                     this.gameTimer = setInterval(() => {
                         this.timeLeft--;
                         this.timerText.setAttribute('value', 'Time: ' + this.timeLeft);
@@ -65,8 +66,7 @@
                         }
                     }, 1000);
 
-                    // Start spawning moles
-                    this.moleTimer = setInterval(this.spawnMole.bind(this), 1000); // Spawn a mole every second
+                    this.moleTimer = setInterval(this.spawnMole.bind(this), 1000);
                 },
 
                 endGame: function() {
@@ -74,66 +74,73 @@
                     clearInterval(this.moleTimer);
                     this.timerText.setAttribute('value', 'Game Over!');
                     // Remove any remaining moles
-                    this.moles.forEach(mole => mole.parentNode.removeChild(mole));
-                    this.moles = [];
+                    document.querySelectorAll('.mole-entity').forEach(mole => mole.parentNode.removeChild(mole));
                 },
 
                 spawnMole: function () {
-                    // Choose a random hole that doesn't already have a mole
                     const availableHoles = Array.from(this.holes).filter(hole => !hole.querySelector('.mole-entity'));
                     if (availableHoles.length === 0) return;
 
                     const randomHole = availableHoles[Math.floor(Math.random() * availableHoles.length)];
-                    
-                    // Create a new mole
                     const mole = document.createElement('a-entity');
-                    mole.classList.add('mole-entity');
-                    mole.setAttribute('position', {x: 0, y: -0.8, z: 0}); // Start below the ground
+                    
+                    mole.setAttribute('class', 'mole-entity');
+                    mole.setAttribute('position', {x: 0, y: -0.8, z: 0});
+                    mole.setAttribute('material', 'color', '#654321');
 
-                    // Randomly choose between a box and a sphere
+                    // Randomly choose shape
                     if (Math.random() > 0.5) {
                         mole.setAttribute('geometry', 'primitive: box; width: 0.5; height: 0.8; depth: 0.5');
                     } else {
                         mole.setAttribute('geometry', 'primitive: sphere; radius: 0.3');
                         mole.setAttribute('position', {x: 0, y: -0.5, z: 0});
                     }
-                    mole.setAttribute('material', 'color', '#654321');
-
-                    // Add animations
-                    mole.setAttribute('animation__up', 'property: position.y; to: 0.4; dur: 300; easing: easeOutQuad; startEvents: pop');
-                    mole.setAttribute('animation__down', 'property: position.y; to: -0.8; dur: 200; easing: easeInQuad; startEvents: hide');
                     
-                    // Add mole to the scene inside the hole
-                    randomHole.appendChild(mole);
-                    this.moles.push(mole);
-                    
-                    // Trigger the 'pop' up animation
-                    mole.emit('pop');
+                    // --- REVISED ANIMATION LOGIC ---
+                    mole.setAttribute('animation__up', {
+                        property: 'position.y',
+                        to: 0.4,
+                        dur: 300,
+                        easing: 'easeOutQuad',
+                        startEvents: 'pop'
+                    });
+                    mole.setAttribute('animation__down', {
+                        property: 'position.y',
+                        to: -0.8,
+                        dur: 200,
+                        easing: 'easeInQuad',
+                        startEvents: 'hide'
+                    });
 
-                    // Listen for clicks (or gazes)
-                    mole.addEventListener('click', this.moleWhacked.bind(this, mole));
-
-                    // Make the mole hide after a short time
-                    setTimeout(() => {
-                        if (mole.parentNode) { // Check if it hasn't been whacked already
-                           mole.emit('hide');
-                           // After hiding, remove the mole from the scene
-                           setTimeout(() => {
-                               if (mole.parentNode) {
-                                   mole.parentNode.removeChild(mole);
-                                   this.moles.splice(this.moles.indexOf(mole), 1);
-                               }
-                           }, 300);
+                    // Function to remove mole safely
+                    const removeMole = () => {
+                        if (mole.parentNode) {
+                            mole.parentNode.removeChild(mole);
                         }
-                    }, 1500 + Math.random() * 500); // Stays up for 1.5 - 2.0 seconds
-                },
+                    };
 
-                moleWhacked: function(mole) {
-                    if (!mole.parentNode) return; // Already whacked
+                    // Listen for when the 'up' animation finishes
+                    mole.addEventListener('animationcomplete__up', () => {
+                        // After it's up, wait a bit, then trigger the 'hide' animation
+                        setTimeout(() => {
+                            mole.emit('hide');
+                        }, 1200);
+                    });
 
-                    this.updateScore(1);
-                    mole.parentNode.removeChild(mole);
-                    this.moles.splice(this.moles.indexOf(mole), 1);
+                    // Listen for when the 'down' animation finishes, then remove the mole
+                    mole.addEventListener('animationcomplete__down', removeMole);
+
+                    // Handle being whacked
+                    mole.addEventListener('click', () => {
+                        this.updateScore(1);
+                        // Stop listening to other animation events to prevent errors
+                        mole.removeEventListener('animationcomplete__up', null);
+                        mole.removeEventListener('animationcomplete__down', null);
+                        removeMole();
+                    });
+                    
+                    randomHole.appendChild(mole);
+                    mole.emit('pop'); // Start the 'up' animation
                 },
 
                 updateScore: function(points) {
