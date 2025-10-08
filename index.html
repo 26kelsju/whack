@@ -5,9 +5,19 @@
     <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
 </head>
 <body>
-    <a-scene>
+    <a-scene background="color: #87CEEB">
+        <a-assets>
+            <a-mixin id="mole-mixin"
+                     class="mole-entity"
+                     position="0 -0.8 0"
+                     geometry="primitive: box; width: 0.5; height: 0.8; depth: 0.5"
+                     material="color: #654321"
+                     animation__up="property: position; to: 0 0.4 0; dur: 300; easing: easeOutQuad; startEvents: pop"
+                     animation__down="property: position; to: 0 -0.8 0; dur: 200; easing: easeInQuad; startEvents: hide">
+            </a-mixin>
+        </a-assets>
+
         <a-plane id="ground" position="0 0 -4" rotation="-90 0 0" width="10" height="10" color="#7BC8A4"></a-plane>
-        <a-sky color="#87CEEB"></a-sky>
 
         <a-entity id="mole-holes">
             <a-cylinder class="hole" position="-1.5 0.1 -3" radius="0.4" height="0.1" color="#4a2a0a"></a-cylinder>
@@ -18,27 +28,24 @@
             <a-cylinder class="hole" position="1.5 0.1 -4.5" radius="0.4" height="0.1" color="#4a2a0a"></a-cylinder>
         </a-entity>
 
-        <a-text id="score-text" value="Score: 0" position="-1.5 2.5 -3" color="black" width="5"></a-text>
-        <a-text id="timer-text" value="Time: 30" position="1.5 2.5 -3" color="black" width="5" align="right"></a-text>
+        <a-text id="score-text" value="Score: 0" position="-1.5 2.5 -3" color="#FFF" width="5"></a-text>
+        <a-text id="timer-text" value="Time: 30" position="1.5 2.5 -3" color="#FFF" width="5" align="right"></a-text>
 
         <a-camera>
-            <a-cursor color="yellow" raycaster="objects: .mole-entity"></a-cursor>
+            <a-cursor color="#FFD700" raycaster="objects: .mole-entity"></a-cursor>
         </a-camera>
+
+        <a-entity game-logic></a-entity>
 
         <script>
             AFRAME.registerComponent('game-logic', {
-                schema: {
-                    gameDuration: {type: 'number', default: 30000} // 30 seconds
-                },
-
                 init: function () {
                     this.holes = document.querySelectorAll('.hole');
-                    this.score = 0;
                     this.scoreText = document.querySelector('#score-text');
                     this.timerText = document.querySelector('#timer-text');
-                    this.timeLeft = this.data.gameDuration / 1000;
-                    this.gameTimer = null;
-                    this.moleTimer = null;
+                    this.activeMoles = [];
+                    
+                    this.handleMoleWhack = this.handleMoleWhack.bind(this);
                     
                     this.startGame();
                 },
@@ -46,102 +53,90 @@
                 startGame: function() {
                     this.score = 0;
                     this.updateScore(0);
-                    this.timeLeft = this.data.gameDuration / 1000;
-                    this.timerText.setAttribute('value', 'Time: ' + this.timeLeft);
+                    this.timeLeft = 30;
 
                     this.gameTimer = setInterval(() => {
                         this.timeLeft--;
                         this.timerText.setAttribute('value', 'Time: ' + this.timeLeft);
-                        if (this.timeLeft <= 0) {
-                            this.endGame();
-                        }
+                        if (this.timeLeft <= 0) this.endGame();
                     }, 1000);
 
-                    this.moleTimer = setInterval(this.spawnMole.bind(this), 1000);
+                    this.moleSpawner = setInterval(this.spawnMole.bind(this), 1000);
                 },
 
                 endGame: function() {
                     clearInterval(this.gameTimer);
-                    clearInterval(this.moleTimer);
+                    clearInterval(this.moleSpawner);
                     this.timerText.setAttribute('value', 'Game Over!');
-                    // Remove any remaining moles
-                    document.querySelectorAll('.mole-entity').forEach(mole => mole.parentNode.removeChild(mole));
+                    this.activeMoles.forEach(mole => mole.parentNode.removeChild(mole));
+                    this.activeMoles = [];
                 },
 
                 spawnMole: function () {
-                    const availableHoles = Array.from(this.holes).filter(hole => !hole.querySelector('.mole-entity'));
+                    const availableHoles = Array.from(this.holes).filter(hole => hole.childElementCount === 0);
                     if (availableHoles.length === 0) return;
 
                     const randomHole = availableHoles[Math.floor(Math.random() * availableHoles.length)];
                     const mole = document.createElement('a-entity');
                     
-                    mole.setAttribute('class', 'mole-entity');
-                    mole.setAttribute('position', {x: 0, y: -0.8, z: 0});
-                    mole.setAttribute('material', 'color', '#654321');
+                    mole.setAttribute('mixin', 'mole-mixin');
 
-                    // Randomly choose shape
-                    if (Math.random() > 0.5) {
-                        mole.setAttribute('geometry', 'primitive: box; width: 0.5; height: 0.8; depth: 0.5');
-                    } else {
-                        mole.setAttribute('geometry', 'primitive: sphere; radius: 0.3');
-                        mole.setAttribute('position', {x: 0, y: -0.5, z: 0});
+                    if (Math.random() < 0.5) {
+                        mole.setAttribute('geometry', { primitive: 'sphere', radius: 0.3 });
                     }
                     
-                    // --- REVISED ANIMATION LOGIC ---
-                    mole.setAttribute('animation__up', {
-                        property: 'position.y',
-                        to: 0.4,
-                        dur: 300,
-                        easing: 'easeOutQuad',
-                        startEvents: 'pop'
-                    });
-                    mole.setAttribute('animation__down', {
-                        property: 'position.y',
-                        to: -0.8,
-                        dur: 200,
-                        easing: 'easeInQuad',
-                        startEvents: 'hide'
-                    });
-
-                    // Function to remove mole safely
-                    const removeMole = () => {
-                        if (mole.parentNode) {
-                            mole.parentNode.removeChild(mole);
-                        }
-                    };
-
-                    // Listen for when the 'up' animation finishes
-                    mole.addEventListener('animationcomplete__up', () => {
-                        // After it's up, wait a bit, then trigger the 'hide' animation
-                        setTimeout(() => {
-                            mole.emit('hide');
-                        }, 1200);
-                    });
-
-                    // Listen for when the 'down' animation finishes, then remove the mole
-                    mole.addEventListener('animationcomplete__down', removeMole);
-
-                    // Handle being whacked
-                    mole.addEventListener('click', () => {
-                        this.updateScore(1);
-                        // Stop listening to other animation events to prevent errors
-                        mole.removeEventListener('animationcomplete__up', null);
-                        mole.removeEventListener('animationcomplete__down', null);
-                        removeMole();
-                    });
-                    
                     randomHole.appendChild(mole);
-                    mole.emit('pop'); // Start the 'up' animation
+                    this.activeMoles.push(mole);
+                    mole.addEventListener('click', this.handleMoleWhack);
+                    
+                    // --- Mole Lifecycle Logic ---
+
+                    // 1. Pop up from the hole.
+                    mole.emit('pop');
+
+                    // 2. Set a timer to hide the mole after it's been up for a short time.
+                    const hideTimer = setTimeout(() => {
+                        mole.emit('hide');
+                    }, 1500 + Math.random() * 500);
+
+                    // 3. Set another timer to remove the mole from the world AFTER it has finished hiding.
+                    const removeTimer = setTimeout(() => {
+                        if (mole.parentNode) {
+                           this.removeMole(mole);
+                        }
+                    }, 2500);
+
+                    // Store timers on the mole so we can cancel them if it gets whacked.
+                    mole.timers = { hide: hideTimer, remove: removeTimer };
+                },
+
+                handleMoleWhack: function(evt) {
+                    const mole = evt.target;
+                    
+                    // When whacked, stop the timers that would have hidden and removed it.
+                    clearTimeout(mole.timers.hide);
+                    clearTimeout(mole.timers.remove);
+                    
+                    this.updateScore(1);
+                    this.removeMole(mole);
+                },
+                
+                removeMole: function(mole) {
+                    if (!mole || !mole.parentNode) return;
+                    
+                    mole.removeEventListener('click', this.handleMoleWhack);
+                    mole.parentNode.removeChild(mole);
+                    
+                    const index = this.activeMoles.indexOf(mole);
+                    if (index > -1) this.activeMoles.splice(index, 1);
                 },
 
                 updateScore: function(points) {
                     this.score += points;
-                    this.scoreText.setAttribute('value', 'Score: ' + this.score);
+                    this.scoreText.setAttribute('value', `Score: ${this.score}`);
                 }
             });
         </script>
-
-        <a-entity game-logic></a-entity>
     </a-scene>
 </body>
 </html>
