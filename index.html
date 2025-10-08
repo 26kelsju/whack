@@ -1,47 +1,124 @@
 <!DOCTYPE html>
 <html>
-  <head>
-    <title>Whack-a-Mole VR</title>
+<head>
+    <title>Whack-A-Mole VR</title>
     <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
-    <script src="game.js" defer></script>
-  </head>
-  <body>
-    <a-scene background="color: #87CEEB">
+    <script>
+        // This is our custom component for all the game logic.
+        AFRAME.registerComponent('game-logic', {
+            // The schema defines any properties our component takes. We don't need any for this simple game.
+            schema: {},
 
-      <a-plane
-        position="0 0 -4"
-        rotation="-90 0 0"
-        width="10"
-        height="10"
-        color="#4CAF50"
-        shadow
-      ></a-plane>
+            // The init function runs once when the component is first attached, usually at the start of the scene.
+            init: function () {
+                console.log("Game logic initialized!");
+                // Grab all the entities that are our "moles". We use the .whackable class to identify them.
+                this.moles = document.querySelectorAll('.whackable');
+                this.score = 0;
+                this.scoreText = document.querySelector('#score-text');
+                this.activeMole = null; // This will keep track of which mole is currently "up".
 
-      <a-entity id="mole-positions">
-        <a-entity class="mole-hole" position="-1.5 0.5 -3"></a-entity>
-        <a-entity class="mole-hole" position="0 0.5 -3"></a-entity>
-        <a-entity class="mole-hole" position="1.5 0.5 -3"></a-entity>
-        <a-entity class="mole-hole" position="-1.5 0.5 -5"></a-entity>
-        <a-entity class="mole-hole" position="0 0.5 -5"></a-entity>
-        <a-entity class="mole-hole" position="1.5 0.5 -5"></a-entity>
-      </a-entity>
-      
-      <a-camera>
-        <a-cursor
-          raycaster="objects: .mole"
-          fuse="true"
-          fuse-timeout="1000"
-        ></a-cursor>
-      </a-camera>
+                // Start the main game loop. setInterval will run the popUpRandomMole function every 1500ms (1.5 seconds).
+                this.gameLoop = setInterval(this.popUpRandomMole.bind(this), 1500);
 
-      <a-text 
-        id="score-text"
-        value="Score: 0" 
-        position="-1 2 -2" 
-        color="black"
-        width="4">
-      </a-text>
+                // Add event listeners to every mole.
+                this.moles.forEach(mole => {
+                    mole.addEventListener('click', this.onMoleWhacked.bind(this, mole));
+                });
+            },
 
+            // This function is called when a mole is clicked.
+            onMoleWhacked: function (mole) {
+                // Check if the clicked mole is the one that is currently active (popped up).
+                if (mole === this.activeMole) {
+                    console.log("WHACKED!");
+                    this.score++; // Increase the score.
+                    this.scoreText.setAttribute('value', `Score: ${this.score}`); // Update the score display.
+                    
+                    // Play a quick "pop" animation for feedback.
+                    mole.setAttribute('animation', {
+                        property: 'scale',
+                        to: '1.2 1.2 1.2',
+                        dir: 'alternate',
+                        dur: 100,
+                        loop: 1
+                    });
+
+                    this.hideMole(mole); // Hide the mole immediately.
+                    this.activeMole = null; // No mole is active now.
+                }
+            },
+
+            // This function hides a specific mole.
+            hideMole: function(mole) {
+                if (mole) {
+                    // We move the mole back down below the ground.
+                    mole.setAttribute('position', { x: mole.object3D.position.x, y: -2, z: mole.object3D.position.z });
+                }
+            },
+            
+            // This function picks a random mole and makes it pop up.
+            popUpRandomMole: function () {
+                // First, if there's a mole already up, hide it.
+                if (this.activeMole) {
+                    this.hideMole(this.activeMole);
+                }
+
+                // Pick a random mole from our list of moles.
+                const randomIndex = Math.floor(Math.random() * this.moles.length);
+                const mole = this.moles[randomIndex];
+                this.activeMole = mole;
+
+                // Move the mole up so it's visible.
+                mole.setAttribute('position', { x: mole.object3D.position.x, y: 0.5, z: mole.object3D.position.z });
+
+                // Set a timer. If the mole isn't hit after 1200ms, hide it again.
+                setTimeout(() => {
+                    // Only hide it if it's still the active mole (i.e., it hasn't been whacked).
+                    if (this.activeMole === mole) {
+                        this.hideMole(mole);
+                        this.activeMole = null;
+                    }
+                }, 1200);
+            }
+        });
+    </script>
+</head>
+<body>
+    <a-scene background="color: #87CEEB" game-logic>
+
+        <a-assets>
+            <a-mixin id="mole-mixin"
+                     class="whackable"
+                     position="0 -2 0" 
+                     color="#5C4033">
+            </a-mixin>
+        </a-assets>
+
+        <a-entity camera look-controls position="0 1.6 4">
+            <a-entity cursor="fuse: true; fuseTimeout: 500"
+                      position="0 0 -1"
+                      geometry="primitive: ring; radiusInner: 0.02; radiusOuter: 0.03"
+                      material="color: black; shader: flat">
+            </a-entity>
+        </a-entity>
+        
+        <a-text id="score-text" value="Score: 0" position="-0.5 2.5 -2" color="black"></a-text>
+
+        <a-cylinder color="#7CFC00" radius="3" height="0.1" position="0 0 0"></a-cylinder>
+
+        <a-box mixin="mole-mixin" position="-1.5 0.5 -1.5"></a-box>
+        <a-sphere mixin="mole-mixin" position="0 0.5 -2"></a-sphere>
+        <a-box mixin="mole-mixin" position="1.5 0.5 -1.5"></a-box>
+
+        <a-sphere mixin="mole-mixin" position="-2 0.5 0"></a-sphere>
+        <a-box mixin="mole-mixin" position="0 0.5 0"></a-box>
+        <a-sphere mixin="mole-mixin" position="2 0.5 0"></a-sphere>
+        
+        <a-box mixin="mole-mixin" position="-1.5 0.5 1.5"></a-box>
+        <a-sphere mixin="mole-mixin" position="0 0.5 2"></a-sphere>
+        <a-box mixin="mole-mixin" position="1.5 0.5 1.5"></a-box>
+        
     </a-scene>
-  </body>
+</body>
 </html>
