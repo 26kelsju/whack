@@ -4,7 +4,7 @@
 function runGame() {
   // --- Game Variables ---
   let score = 0;
-  let timeLeft = 30; // Timer starts at 30 seconds
+  let timeLeft = 60; // Timer starts at 60 seconds
   const holes = document.querySelectorAll('.hole');
   const scoreText = document.querySelector('#scoreText');
   const timerText = document.querySelector('#timerText'); // Get the timer element
