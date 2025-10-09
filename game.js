@@ -51,8 +51,8 @@ function runGame() {
     }
 
     const isBox = Math.random() > 0.5;
-    const moleShape = isBox ? 'a-box' : 'a-sphere';
-    const moleColor = isBox ? '#FFC107' : '#E91E63';
+    const moleShape = isBox ? 'a-box' : 'a-sphere' : 'a-cylinder';
+    const moleColor = isBox ? '#FFC107' : '#E91E63' : '#964B00';
     const mole = document.createElement(moleShape);
     
     mole.setAttribute('class', 'mole');
